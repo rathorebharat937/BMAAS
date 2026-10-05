@@ -54,8 +54,9 @@ export const modulesAPI = {
   update: (id, data) => api.put(`/modules/${id}`, data),
   delete: (id) => api.delete(`/modules/${id}`),
   getDevelopers: (moduleId) => api.get(`/modules/${moduleId}/developers`),
-  mapDeveloper: (moduleId, developerId) => 
-    api.post(`/modules/${moduleId}/developers`, { developerId }),
+  getMembers: (moduleId) => api.get(`/modules/${moduleId}/members`),
+  mapDeveloper: (moduleId, developerId, roleOnModule) => 
+    api.post(`/modules/${moduleId}/developers`, { developerId, roleOnModule }),
   unmapDeveloper: (moduleId, developerId) => 
     api.delete(`/modules/${moduleId}/developers/${developerId}`),
 };

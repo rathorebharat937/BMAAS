@@ -15,7 +15,11 @@ public interface DeveloperRepository extends JpaRepository<Developer, Long> {
 
     Optional<Developer> findByUserId(Long userId);
 
+    Optional<Developer> findByEmployeeId(String employeeId);
+
     Boolean existsByEmail(String email);
 
     Boolean existsByUserId(Long userId);
+
+    Boolean existsByEmployeeId(String employeeId);
 }

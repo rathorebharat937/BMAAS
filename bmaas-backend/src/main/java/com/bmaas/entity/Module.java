@@ -39,13 +39,14 @@ public class Module {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
-    @ManyToMany
-    @JoinTable(
-        name = "developer_module_mapping",
-        joinColumns = @JoinColumn(name = "module_id"),
-        inverseJoinColumns = @JoinColumn(name = "developer_id")
-    )
-    private List<Developer> developers = new ArrayList<>();
+    /**
+     * Team membership via join entity (replaces old plain @ManyToMany).
+     * Allows storing roleOnModule per developer-module pairing.
+     * Bug-assignment logic (Phase 4) is NOT changed — it uses BugServiceImpl
+     * which checks module.getDevelopers() via the helper below.
+     */
+    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ModuleDeveloper> developerMemberships = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -68,7 +69,8 @@ public class Module {
         CRITICAL
     }
 
-    // Getters and Setters
+    // ── Getters and Setters ──────────────────────────────────────────────────
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -90,8 +92,23 @@ public class Module {
     public Project getProject() { return project; }
     public void setProject(Project project) { this.project = project; }
 
-    public List<Developer> getDevelopers() { return developers; }
-    public void setDevelopers(List<Developer> developers) { this.developers = developers; }
+    public List<ModuleDeveloper> getDeveloperMemberships() { return developerMemberships; }
+    public void setDeveloperMemberships(List<ModuleDeveloper> developerMemberships) {
+        this.developerMemberships = developerMemberships;
+    }
+
+    /**
+     * Convenience helper used by Phase 4 BugServiceImpl.assignBug()
+     * which calls module.getDevelopers() to validate bug assignment eligibility.
+     * Returns the actual Developer objects from the join entity list.
+     */
+    public List<Developer> getDevelopers() {
+        List<Developer> developers = new ArrayList<>();
+        for (ModuleDeveloper md : developerMemberships) {
+            developers.add(md.getDeveloper());
+        }
+        return developers;
+    }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
