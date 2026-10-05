@@ -88,9 +88,9 @@ The frontend starts on **http://localhost:5173**.
 | Variable            | Default                                                            | Description            |
 |---------------------|--------------------------------------------------------------------|------------------------|
 | `DATABASE_URL`      | `jdbc:postgresql://localhost:5432/bmaas_db`                        | JDBC connection string |
-| `DATABASE_USERNAME` | `bharatrathore`                                                    | PostgreSQL username    |
-| `DATABASE_PASSWORD` | `Bharat@1425`                                                      | PostgreSQL password    |
-| `JWT_SECRET`        | `5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437`  | JWT signing key (hex)  |
+| `DATABASE_USERNAME` | `username`.                                                        | PostgreSQL username    |
+| `DATABASE_PASSWORD` | `password`.                                                        | PostgreSQL password    |
+| `JWT_SECRET`        | `secret key`  | JWT signing key (hex)  |
 | `CORS_ORIGINS`      | `http://localhost:5173,http://localhost:3000`                       | Allowed CORS origins   |
 
 ### Frontend
