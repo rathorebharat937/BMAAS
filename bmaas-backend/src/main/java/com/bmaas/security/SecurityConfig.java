@@ -77,8 +77,8 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/bugs/**").hasRole("PROJECT_MANAGER")
                 // Bug creation and listing
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/projects/*/modules/*/bugs").hasAnyRole("PROJECT_MANAGER", "TESTER")
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/projects/*/bugs/**").hasAnyRole("PROJECT_MANAGER", "TESTER")
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/projects/*/bugs").hasAnyRole("PROJECT_MANAGER", "TESTER")
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/projects/*/bugs/**").hasAnyRole("PROJECT_MANAGER", "TESTER", "DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/projects/*/bugs").hasAnyRole("PROJECT_MANAGER", "TESTER", "DEVELOPER")
                 // Bug status & details
                 .requestMatchers("/api/bugs/**").hasAnyRole("PROJECT_MANAGER", "TESTER", "DEVELOPER")
                 // Projects & Modules endpoints

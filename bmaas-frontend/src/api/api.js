@@ -66,6 +66,7 @@ export const developersAPI = {
   getAll: () => api.get('/developers'),
   getById: (id) => api.get(`/developers/${id}`),
   getMyProfile: () => api.get('/developers/me'),
+  getMyWork: () => api.get('/developers/me/work'),
   getMyBugs: (params) => api.get('/developers/me/bugs', { params }),
   getMetrics: (id) => api.get(`/developers/${id}/metrics`),
   getWorkload: (id) => api.get(`/developers/${id}/workload`),

@@ -12,6 +12,8 @@ public interface ModuleDeveloperRepository extends JpaRepository<ModuleDeveloper
 
     List<ModuleDeveloper> findByModuleId(Long moduleId);
 
+    List<ModuleDeveloper> findByDeveloperId(Long developerId);
+
     Optional<ModuleDeveloper> findByModuleIdAndDeveloperId(Long moduleId, Long developerId);
 
     boolean existsByModuleIdAndDeveloperId(Long moduleId, Long developerId);

@@ -28,6 +28,9 @@ function ProjectDetail() {
     priority: 'MEDIUM',
   });
 
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isPM = user.role === 'PROJECT_MANAGER';
+
   useEffect(() => {
     fetchData();
     fetchAllDevelopers();
@@ -220,13 +223,20 @@ function ProjectDetail() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link to="/" className="text-blue-600 hover:underline font-medium text-sm">
-              ← Back to Dashboard
+            <Link
+              to={user.role === 'DEVELOPER' ? '/my-bugs' : '/'}
+              className="text-blue-600 hover:underline font-medium text-sm"
+            >
+              {user.role === 'DEVELOPER' ? '← Back to Developer Workspace' : '← Back to Dashboard'}
             </Link>
-            <span className="text-gray-300">|</span>
-            <Link to="/developers" className="text-gray-600 hover:text-blue-600 text-sm font-medium">
-              👨‍💻 Standalone Developers Page
-            </Link>
+            {isPM && (
+              <>
+                <span className="text-gray-300">|</span>
+                <Link to="/developers" className="text-gray-600 hover:text-blue-600 text-sm font-medium">
+                  👨‍💻 Standalone Developers Page
+                </Link>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <Link
@@ -273,12 +283,14 @@ function ProjectDetail() {
                 Manage modules and assign developers directly with specific module roles
               </p>
             </div>
-            <button
-              onClick={() => { resetForm(); setEditingModule(null); setShowModuleModal(true); }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
-            >
-              + New Module
-            </button>
+            {isPM && (
+              <button
+                onClick={() => { resetForm(); setEditingModule(null); setShowModuleModal(true); }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+              >
+                + New Module
+              </button>
+            )}
           </div>
 
           {modules.length === 0 ? (
@@ -379,21 +391,25 @@ function ProjectDetail() {
                           }`}
                         >
                           <span>👥</span>
-                          <span>{isExpanded ? 'Hide Team Panel' : `Manage Team (${membersCount})`}</span>
+                          <span>{isExpanded ? 'Hide Team Panel' : isPM ? `Manage Team (${membersCount})` : `View Team (${membersCount})`}</span>
                         </button>
 
-                        <button
-                          onClick={() => handleEditModule(module)}
-                          className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200 transition"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteModule(module.id)}
-                          className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition"
-                        >
-                          Delete
-                        </button>
+                        {isPM && (
+                          <>
+                            <button
+                              onClick={() => handleEditModule(module)}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200 transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteModule(module.id)}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -468,21 +484,24 @@ function ProjectDetail() {
                                     </div>
                                   </div>
 
-                                  <div className="mt-3 pt-2 border-t border-gray-200 flex justify-end">
-                                    <button
-                                      onClick={() => handleRemoveDeveloperFromModule(module.id, member.developerId)}
-                                      className="text-red-600 hover:text-red-800 text-xs font-semibold flex items-center gap-1"
-                                    >
-                                      ✕ Remove from Team
-                                    </button>
-                                  </div>
+                                  {isPM && (
+                                    <div className="mt-3 pt-2 border-t border-gray-200 flex justify-end">
+                                      <button
+                                        onClick={() => handleRemoveDeveloperFromModule(module.id, member.developerId)}
+                                        className="text-red-600 hover:text-red-800 text-xs font-semibold flex items-center gap-1"
+                                      >
+                                        ✕ Remove from Team
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
                           )}
                         </div>
 
-                        {/* Section 2: Add Developers to Module Team */}
+                        {/* Section 2: Add Developers to Module Team (PM Only) */}
+                        {isPM && (
                         <div className="border-t pt-5">
                           <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">
                             ➕ Add Developer to {module.name} Team
@@ -594,6 +613,7 @@ function ProjectDetail() {
                             </div>
                           )}
                         </div>
+                        )}
                       </div>
                     )}
                   </div>

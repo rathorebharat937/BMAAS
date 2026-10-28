@@ -32,6 +32,8 @@ build/
 ### VS Code ###
 .vscode/
 
-### Environment Variables ###
+### Environment Variables & Local Credentials ###
 .env
 .env.local
+*.local.md
+seed-credentials.local.md

@@ -128,6 +128,12 @@ public class BugServiceImpl implements BugService {
     public List<BugResponse> getBugsForDeveloper(Long userId, Long moduleId, BugStatus status, BugSeverity severity, SlaStatus slaStatus) {
         Developer developer = developerRepository.findByUserId(userId).orElse(null);
         if (developer == null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.getRole() == UserRole.DEVELOPER) {
+                developer = developerRepository.findByEmailIgnoreCase(user.getEmail()).orElse(null);
+            }
+        }
+        if (developer == null) {
             return Collections.emptyList();
         }
 
@@ -153,6 +159,12 @@ public class BugServiceImpl implements BugService {
 
         if (currentUserRole == UserRole.DEVELOPER) {
             Developer dev = developerRepository.findByUserId(currentUserId).orElse(null);
+            if (dev == null) {
+                User user = userRepository.findById(currentUserId).orElse(null);
+                if (user != null) {
+                    dev = developerRepository.findByEmailIgnoreCase(user.getEmail()).orElse(null);
+                }
+            }
             if (dev == null || bug.getAssignedDeveloper() == null || !bug.getAssignedDeveloper().getId().equals(dev.getId())) {
                 throw new AccessDeniedException("You are not authorized to view this bug because it is not assigned to you.");
             }
@@ -210,8 +222,16 @@ public class BugServiceImpl implements BugService {
 
         // Role authorization check
         if (currentUserRole == UserRole.DEVELOPER) {
-            Developer dev = developerRepository.findByUserId(currentUserId)
-                    .orElseThrow(() -> new AccessDeniedException("User is not linked to any developer profile"));
+            Developer dev = developerRepository.findByUserId(currentUserId).orElse(null);
+            if (dev == null) {
+                User user = userRepository.findById(currentUserId).orElse(null);
+                if (user != null) {
+                    dev = developerRepository.findByEmailIgnoreCase(user.getEmail()).orElse(null);
+                }
+            }
+            if (dev == null) {
+                throw new AccessDeniedException("User is not linked to any developer profile");
+            }
 
             if (bug.getAssignedDeveloper() == null || !bug.getAssignedDeveloper().getId().equals(dev.getId())) {
                 throw new AccessDeniedException("You cannot change the status of a bug not assigned to you");

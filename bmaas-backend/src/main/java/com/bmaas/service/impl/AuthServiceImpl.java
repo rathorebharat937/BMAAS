@@ -87,6 +87,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(
@@ -97,6 +98,20 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByUsername(request.getUsername())
             .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Retroactive auto-link: if DEVELOPER user has no linked Developer record,
+        // check for a matching Developer by email and link if available
+        if (user.getRole() == User.UserRole.DEVELOPER) {
+            boolean alreadyLinked = developerRepository.findByUserId(user.getId()).isPresent();
+            if (!alreadyLinked) {
+                developerRepository.findByEmailIgnoreCase(user.getEmail()).ifPresent(dev -> {
+                    if (dev.getUser() == null) {
+                        dev.setUser(user);
+                        developerRepository.save(dev);
+                    }
+                });
+            }
+        }
 
         String token = jwtTokenProvider.generateToken(user.getUsername());
 

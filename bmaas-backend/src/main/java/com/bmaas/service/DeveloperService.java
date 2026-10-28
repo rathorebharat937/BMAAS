@@ -35,4 +35,6 @@ public interface DeveloperService {
     DeveloperResponse linkUser(Long developerId, Long userId);
 
     DeveloperResponse getMyProfile(Long userId);
+
+    List<com.bmaas.dto.developer.AssignedWorkResponse> getAssignedWork(Long userId);
 }

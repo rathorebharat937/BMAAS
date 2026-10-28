@@ -48,6 +48,13 @@ public class DeveloperController {
         return ResponseEntity.ok(ApiResponse.success("Developer profile retrieved successfully", developer));
     }
 
+    @GetMapping({"/me/work", "/me/modules"})
+    public ResponseEntity<ApiResponse> getMyAssignedWork(@AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = getCurrentUserId(userDetails);
+        List<com.bmaas.dto.developer.AssignedWorkResponse> work = developerService.getAssignedWork(userId);
+        return ResponseEntity.ok(ApiResponse.success("Assigned work retrieved successfully", work));
+    }
+
     @GetMapping("/me/bugs")
     public ResponseEntity<ApiResponse> getMyBugs(
             @RequestParam(required = false) Long moduleId,

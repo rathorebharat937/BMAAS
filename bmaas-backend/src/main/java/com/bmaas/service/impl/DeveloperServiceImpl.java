@@ -14,10 +14,15 @@ import com.bmaas.repository.ModuleDeveloperRepository;
 import com.bmaas.repository.ModuleRepository;
 import com.bmaas.repository.UserRepository;
 import com.bmaas.service.DeveloperService;
+import com.bmaas.dto.developer.AssignedWorkResponse;
+import com.bmaas.entity.Bug;
+import com.bmaas.repository.BugRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -29,6 +34,7 @@ public class DeveloperServiceImpl implements DeveloperService {
     private final ModuleRepository moduleRepository;
     private final ModuleDeveloperRepository moduleDeveloperRepository;
     private final UserRepository userRepository;
+    private final BugRepository bugRepository;
     private final com.bmaas.repository.DeveloperMetricsRepository metricsRepository;
     private final com.bmaas.service.WorkloadService workloadService;
 
@@ -36,12 +42,14 @@ public class DeveloperServiceImpl implements DeveloperService {
                                 ModuleRepository moduleRepository,
                                 ModuleDeveloperRepository moduleDeveloperRepository,
                                 UserRepository userRepository,
+                                BugRepository bugRepository,
                                 com.bmaas.repository.DeveloperMetricsRepository metricsRepository,
                                 com.bmaas.service.WorkloadService workloadService) {
         this.developerRepository = developerRepository;
         this.moduleRepository = moduleRepository;
         this.moduleDeveloperRepository = moduleDeveloperRepository;
         this.userRepository = userRepository;
+        this.bugRepository = bugRepository;
         this.metricsRepository = metricsRepository;
         this.workloadService = workloadService;
     }
@@ -207,11 +215,104 @@ public class DeveloperServiceImpl implements DeveloperService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public DeveloperResponse getMyProfile(Long userId) {
-        return developerRepository.findByUserId(userId)
-            .map(this::mapToResponse)
-            .orElse(null);
+        Optional<Developer> devOpt = developerRepository.findByUserId(userId);
+        if (devOpt.isPresent()) {
+            return mapToResponse(devOpt.get());
+        }
+
+        // Retroactive auto-link fallback: if DEVELOPER user has matching unlinked Developer by email
+        User user = userRepository.findById(userId).orElse(null);
+        if (user != null && user.getRole() == User.UserRole.DEVELOPER) {
+            Optional<Developer> matchingDev = developerRepository.findByEmailIgnoreCase(user.getEmail());
+            if (matchingDev.isPresent() && matchingDev.get().getUser() == null) {
+                Developer dev = matchingDev.get();
+                dev.setUser(user);
+                Developer saved = developerRepository.save(dev);
+                return mapToResponse(saved);
+            }
+        }
+
+        return null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AssignedWorkResponse> getAssignedWork(Long userId) {
+        Developer developer = developerRepository.findByUserId(userId).orElse(null);
+        if (developer == null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.getRole() == User.UserRole.DEVELOPER) {
+                developer = developerRepository.findByEmailIgnoreCase(user.getEmail()).orElse(null);
+            }
+        }
+        if (developer == null) {
+            return Collections.emptyList();
+        }
+
+        List<ModuleDeveloper> memberships = moduleDeveloperRepository.findByDeveloperId(developer.getId());
+        List<AssignedWorkResponse> result = new ArrayList<>();
+
+        for (ModuleDeveloper md : memberships) {
+            com.bmaas.entity.Module module = md.getModule();
+            if (module == null) continue;
+            com.bmaas.entity.Project project = module.getProject();
+
+            AssignedWorkResponse resp = new AssignedWorkResponse();
+            resp.setModuleId(module.getId());
+            resp.setModuleName(module.getName());
+            resp.setModuleDescription(module.getDescription());
+            resp.setModuleTechnology(module.getTechnology());
+            resp.setModuleStatus(module.getStatus() != null ? module.getStatus().name() : null);
+            resp.setModulePriority(module.getPriority() != null ? module.getPriority().name() : null);
+            resp.setRoleOnModule(md.getRoleOnModule() != null ? md.getRoleOnModule() : "Contributor");
+            resp.setAssignedAt(md.getAssignedAt());
+
+            if (project != null) {
+                resp.setProjectId(project.getId());
+                resp.setProjectName(project.getName());
+                resp.setProjectDescription(project.getDescription());
+                resp.setProjectStatus(project.getStatus() != null ? project.getStatus().name() : null);
+                resp.setProjectTechnologyStack(project.getTechnologyStack());
+                if (project.getProjectManager() != null) {
+                    resp.setProjectManagerName(project.getProjectManager().getFullName());
+                    resp.setProjectManagerEmail(project.getProjectManager().getEmail());
+                }
+
+                // Query bugs for this module
+                List<Bug> moduleBugs = bugRepository.findByProjectIdAndModuleId(project.getId(), module.getId());
+                resp.setTotalModuleBugs(moduleBugs.size());
+                long active = moduleBugs.stream()
+                        .filter(b -> b.getStatus() != Bug.BugStatus.CLOSED && b.getStatus() != Bug.BugStatus.RESOLVED && b.getStatus() != Bug.BugStatus.REJECTED)
+                        .count();
+                resp.setActiveModuleBugs(active);
+                final Long devId = developer.getId();
+                long myBugs = moduleBugs.stream()
+                        .filter(b -> b.getAssignedDeveloper() != null && b.getAssignedDeveloper().getId().equals(devId))
+                        .count();
+                resp.setMyAssignedBugs(myBugs);
+            }
+
+            // Other team members on this module
+            List<String> teamNames = moduleDeveloperRepository.findByModuleId(module.getId()).stream()
+                    .map(m -> m.getDeveloper().getName())
+                    .distinct()
+                    .collect(Collectors.toList());
+            resp.setTeamMemberNames(teamNames);
+
+            result.add(resp);
+        }
+
+        // Sort most recently assigned first
+        result.sort((a, b) -> {
+            if (a.getAssignedAt() == null && b.getAssignedAt() == null) return 0;
+            if (a.getAssignedAt() == null) return 1;
+            if (b.getAssignedAt() == null) return -1;
+            return b.getAssignedAt().compareTo(a.getAssignedAt());
+        });
+
+        return result;
     }
 
     // ── Private Helpers ──────────────────────────────────────────────────────
