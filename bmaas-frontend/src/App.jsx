@@ -47,6 +47,11 @@ function App() {
             <BugForm />
           </PrivateRoute>
         } />
+        <Route path="/bugs/new" element={
+          <PrivateRoute>
+            <BugForm />
+          </PrivateRoute>
+        } />
         <Route path="/bugs/:id" element={
           <PrivateRoute>
             <BugDetail />

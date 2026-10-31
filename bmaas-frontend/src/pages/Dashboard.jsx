@@ -221,6 +221,14 @@ function Dashboard() {
                     >
                       <span>🐛</span> Bugs
                     </Link>
+                    {isTester && (
+                      <Link
+                        to={`/projects/${project.id}/bugs/new`}
+                        className="flex-1 bg-red-50 text-red-700 hover:bg-red-100 text-center py-2 rounded-lg text-sm font-semibold border border-red-200 shadow-sm flex items-center justify-center gap-1"
+                      >
+                        <span>+</span> Report Bug
+                      </Link>
+                    )}
                     {isPM && (
                       <Link
                         to={`/projects/${project.id}`}

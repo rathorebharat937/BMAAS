@@ -97,6 +97,7 @@ public class AuthServiceImpl implements AuthService {
         );
 
         User user = userRepository.findByUsername(request.getUsername())
+            .or(() -> userRepository.findByEmail(request.getUsername()))
             .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Retroactive auto-link: if DEVELOPER user has no linked Developer record,

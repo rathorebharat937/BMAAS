@@ -3,14 +3,17 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { projectsAPI, modulesAPI, bugsAPI } from '../api/api';
 
 function BugForm() {
-  const { projectId, id: bugId } = useParams();
+  const { projectId: routeProjectId, id: bugId } = useParams();
   const navigate = useNavigate();
   const isEditMode = Boolean(bugId);
 
   const [loading, setLoading] = useState(true);
+  const [loadingModules, setLoadingModules] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const [allProjects, setAllProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(routeProjectId || '');
   const [project, setProject] = useState(null);
   const [modules, setModules] = useState([]);
 
@@ -26,11 +29,12 @@ function BugForm() {
     actualResult: '',
   });
 
+  // Initial load
   useEffect(() => {
-    loadData();
-  }, [projectId, bugId]);
+    initForm();
+  }, [routeProjectId, bugId]);
 
-  const loadData = async () => {
+  const initForm = async () => {
     setLoading(true);
     setError('');
     try {
@@ -50,23 +54,30 @@ function BugForm() {
           actualResult: bug.actualResult || '',
         });
 
-        // Fetch project and modules for context
+        setSelectedProjectId(bug.projectId);
         const [projRes, modRes] = await Promise.all([
           projectsAPI.getById(bug.projectId),
           modulesAPI.getByProject(bug.projectId),
         ]);
         setProject(projRes.data.data);
-        setModules(modRes.data.data);
+        setModules(modRes.data.data || []);
       } else {
-        // Create mode
-        const [projRes, modRes] = await Promise.all([
-          projectsAPI.getById(projectId),
-          modulesAPI.getByProject(projectId),
-        ]);
-        setProject(projRes.data.data);
-        setModules(modRes.data.data);
-        if (modRes.data.data.length > 0) {
-          setFormData((prev) => ({ ...prev, moduleId: modRes.data.data[0].id }));
+        // Create mode: fetch all projects available
+        const projListRes = await projectsAPI.getAll();
+        const availableProjects = projListRes.data?.data || [];
+        setAllProjects(availableProjects);
+
+        const initialProjectId = routeProjectId || (availableProjects.length > 0 ? String(availableProjects[0].id) : '');
+        setSelectedProjectId(initialProjectId);
+
+        if (initialProjectId) {
+          const [projRes, modRes] = await Promise.all([
+            projectsAPI.getById(initialProjectId),
+            modulesAPI.getByProject(initialProjectId),
+          ]);
+          setProject(projRes.data.data);
+          const projectModules = modRes.data.data || [];
+          setModules(projectModules);
         }
       }
     } catch (err) {
@@ -74,6 +85,29 @@ function BugForm() {
       setError('Failed to load form data. Please check if the project exists.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // When QA changes project in create mode, fetch the modules for that project dynamically
+  const handleProjectChange = async (e) => {
+    const newProjectId = e.target.value;
+    setSelectedProjectId(newProjectId);
+    setFormData((prev) => ({ ...prev, moduleId: '' }));
+    setLoadingModules(true);
+    setError('');
+    try {
+      const [projRes, modRes] = await Promise.all([
+        projectsAPI.getById(newProjectId),
+        modulesAPI.getByProject(newProjectId),
+      ]);
+      setProject(projRes.data.data);
+      const projectModules = modRes.data.data || [];
+      setModules(projectModules);
+    } catch (err) {
+      console.error('Error loading project modules:', err);
+      setError('Failed to load modules for the selected project.');
+    } finally {
+      setLoadingModules(false);
     }
   };
 
@@ -89,7 +123,7 @@ function BugForm() {
       return;
     }
     if (!isEditMode && !formData.moduleId) {
-      setError('Please select a module');
+      setError('Please select a module where this bug occurs.');
       return;
     }
 
@@ -101,8 +135,8 @@ function BugForm() {
         await bugsAPI.update(bugId, formData);
         navigate(`/bugs/${bugId}`);
       } else {
-        await bugsAPI.create(projectId, formData.moduleId, formData);
-        navigate(`/projects/${projectId}/bugs`);
+        await bugsAPI.create(selectedProjectId, formData.moduleId, formData);
+        navigate(`/projects/${selectedProjectId}/bugs`);
       }
     } catch (err) {
       console.error('Error saving bug:', err);
@@ -119,7 +153,7 @@ function BugForm() {
     );
   }
 
-  const currentProjectId = isEditMode ? project?.id : projectId;
+  const currentProjectId = isEditMode ? project?.id : selectedProjectId;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -128,16 +162,21 @@ function BugForm() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Link
-              to={isEditMode ? `/bugs/${bugId}` : `/projects/${currentProjectId}/bugs`}
+              to={isEditMode ? `/bugs/${bugId}` : currentProjectId ? `/projects/${currentProjectId}/bugs` : '/'}
               className="text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
               ← Back
             </Link>
             <span className="text-gray-300">/</span>
             <h1 className="text-xl font-bold text-gray-900">
-              {isEditMode ? `Edit Bug #${bugId}` : `Report New Bug (${project?.name})`}
+              {isEditMode ? `Edit Bug #${bugId}` : `Report New Bug (${project?.name || 'Select Project'})`}
             </h1>
           </div>
+          {project?.projectManagerName && (
+            <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+              PM: {project.projectManagerName}
+            </span>
+          )}
         </div>
       </header>
 
@@ -151,6 +190,30 @@ function BugForm() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Project Selection in Create Mode */}
+            {!isEditMode && allProjects.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                  Project <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedProjectId}
+                  onChange={handleProjectChange}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  required
+                >
+                  {allProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.projectManagerName ? `(Manager: ${p.projectManagerName})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Selecting a project loads all modules created by the project manager for this project.
+                </p>
+              </div>
+            )}
+
             {/* Title */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-1.5">
@@ -171,23 +234,42 @@ function BugForm() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Module */}
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-1.5">
-                  Module {!isEditMode && <span className="text-red-500">*</span>}
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Module {!isEditMode && <span className="text-red-500">*</span>}
+                  </label>
+                  {!isEditMode && (
+                    <span className="text-xs text-gray-500 font-normal">
+                      {loadingModules ? 'Loading...' : `(${modules.length} available)`}
+                    </span>
+                  )}
+                </div>
                 <select
                   name="moduleId"
                   value={formData.moduleId}
                   onChange={handleChange}
-                  disabled={isEditMode}
+                  disabled={isEditMode || loadingModules || modules.length === 0}
                   className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                   required
                 >
+                  <option value="">
+                    {loadingModules
+                      ? 'Loading modules...'
+                      : modules.length === 0
+                      ? '-- No modules in this project --'
+                      : '-- Select Module (where bug occurred) --'}
+                  </option>
                   {modules.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name}
+                      {m.name}{m.description ? ` — ${m.description}` : ''}
                     </option>
                   ))}
                 </select>
+                {modules.length === 0 && !loadingModules && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ No modules available. Ask the Project Manager to add modules to this project first.
+                  </p>
+                )}
                 {isEditMode && (
                   <p className="text-xs text-gray-400 mt-1">Module cannot be changed after creation.</p>
                 )}
@@ -311,7 +393,7 @@ function BugForm() {
               <button
                 type="button"
                 onClick={() =>
-                  navigate(isEditMode ? `/bugs/${bugId}` : `/projects/${currentProjectId}/bugs`)
+                  navigate(isEditMode ? `/bugs/${bugId}` : currentProjectId ? `/projects/${currentProjectId}/bugs` : '/')
                 }
                 className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-100 transition-colors"
               >
@@ -319,7 +401,7 @@ function BugForm() {
               </button>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || (!isEditMode && modules.length === 0)}
                 className="px-6 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50"
               >
                 {saving ? 'Saving...' : isEditMode ? 'Update Bug' : 'Submit Bug Report'}

@@ -20,6 +20,9 @@ public class DeveloperRequest {
     @Email(message = "Email must be valid")
     private String email;
 
+    // Login password set by Project Manager for the developer's user account
+    private String password;
+
     // Original field — kept for backward compatibility
     private String skillsTechStack;
 
@@ -40,6 +43,9 @@ public class DeveloperRequest {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
 
     public String getSkillsTechStack() { return skillsTechStack; }
     public void setSkillsTechStack(String skillsTechStack) { this.skillsTechStack = skillsTechStack; }

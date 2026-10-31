@@ -8,9 +8,11 @@ function Developers() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingDeveloper, setEditingDeveloper] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    password: '',
     jobTitle: '',
     primarySkills: '',
     yearsOfExperience: '',
@@ -50,6 +52,9 @@ function Developers() {
         ...formData,
         yearsOfExperience: formData.yearsOfExperience ? parseFloat(formData.yearsOfExperience) : null,
       };
+      if (editingDeveloper && !payload.password) {
+        delete payload.password;
+      }
       if (editingDeveloper) {
         await developersAPI.update(editingDeveloper.id, payload);
       } else {
@@ -70,6 +75,7 @@ function Developers() {
     setFormData({
       name: developer.name,
       email: developer.email,
+      password: '',
       jobTitle: developer.jobTitle || '',
       primarySkills: developer.primarySkills || '',
       yearsOfExperience: developer.yearsOfExperience != null ? developer.yearsOfExperience.toString() : '',
@@ -94,9 +100,11 @@ function Developers() {
   };
 
   const resetForm = () => {
+    setShowPassword(false);
     setFormData({
       name: '',
       email: '',
+      password: '',
       jobTitle: '',
       primarySkills: '',
       yearsOfExperience: '',
@@ -309,7 +317,7 @@ function Developers() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1 text-gray-700">Email *</label>
+                  <label className="block text-xs font-medium mb-1 text-gray-700">Email * (Login Username)</label>
                   <input
                     type="email"
                     name="email"
@@ -319,6 +327,35 @@ function Developers() {
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1 text-gray-700">
+                  {editingDeveloper ? 'Login Password (leave blank to keep current)' : 'Login Password *'}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder={editingDeveloper ? 'Enter new password to reset' : 'Set password for developer login (e.g. Dev@1234)'}
+                    className="w-full px-3 py-2 pr-16 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    required={!editingDeveloper}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700 px-1 py-0.5"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {editingDeveloper
+                    ? 'Updating the password will allow the developer to log in with this new password.'
+                    : 'The developer will use their email and this password to log in to BMAAS.'}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

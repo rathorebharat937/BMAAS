@@ -17,6 +17,7 @@ import com.bmaas.service.DeveloperService;
 import com.bmaas.dto.developer.AssignedWorkResponse;
 import com.bmaas.entity.Bug;
 import com.bmaas.repository.BugRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +39,7 @@ public class DeveloperServiceImpl implements DeveloperService {
     private final BugRepository bugRepository;
     private final com.bmaas.repository.DeveloperMetricsRepository metricsRepository;
     private final com.bmaas.service.WorkloadService workloadService;
+    private final PasswordEncoder passwordEncoder;
 
     public DeveloperServiceImpl(DeveloperRepository developerRepository,
                                 ModuleRepository moduleRepository,
@@ -44,7 +47,8 @@ public class DeveloperServiceImpl implements DeveloperService {
                                 UserRepository userRepository,
                                 BugRepository bugRepository,
                                 com.bmaas.repository.DeveloperMetricsRepository metricsRepository,
-                                com.bmaas.service.WorkloadService workloadService) {
+                                com.bmaas.service.WorkloadService workloadService,
+                                PasswordEncoder passwordEncoder) {
         this.developerRepository = developerRepository;
         this.moduleRepository = moduleRepository;
         this.moduleDeveloperRepository = moduleDeveloperRepository;
@@ -52,6 +56,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         this.bugRepository = bugRepository;
         this.metricsRepository = metricsRepository;
         this.workloadService = workloadService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -87,12 +92,33 @@ public class DeveloperServiceImpl implements DeveloperService {
 
         Developer developer = buildFromRequest(new Developer(), request);
 
-        // Phase 4: auto-link user account if email matches a DEVELOPER user
-        Optional<User> matchingUser = userRepository.findByEmail(request.getEmail());
-        if (matchingUser.isPresent() && matchingUser.get().getRole() == User.UserRole.DEVELOPER) {
-            developer.setUser(matchingUser.get());
+        // Link or create user account for the developer with DEVELOPER role
+        Optional<User> existingUserOpt = userRepository.findByEmail(request.getEmail())
+                .or(() -> userRepository.findByUsername(request.getEmail()));
+
+        User user;
+        if (existingUserOpt.isPresent()) {
+            user = existingUserOpt.get();
+            user.setRole(User.UserRole.DEVELOPER);
+            user.setFullName(request.getName());
+            if (request.getPassword() != null && !request.getPassword().isBlank()) {
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+            }
+            user = userRepository.save(user);
+        } else {
+            user = new User();
+            user.setUsername(request.getEmail());
+            user.setEmail(request.getEmail());
+            user.setFullName(request.getName());
+            user.setRole(User.UserRole.DEVELOPER);
+            String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank())
+                    ? request.getPassword()
+                    : "Dev@" + UUID.randomUUID().toString().substring(0, 8);
+            user.setPassword(passwordEncoder.encode(rawPassword));
+            user = userRepository.save(user);
         }
 
+        developer.setUser(user);
         Developer savedDeveloper = developerRepository.save(developer);
         return mapToResponse(savedDeveloper);
     }
@@ -103,7 +129,7 @@ public class DeveloperServiceImpl implements DeveloperService {
         Developer developer = developerRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Developer not found with id: " + id));
 
-        if (!developer.getEmail().equals(request.getEmail()) &&
+        if (!developer.getEmail().equalsIgnoreCase(request.getEmail()) &&
             developerRepository.existsByEmail(request.getEmail())) {
             throw new ResourceAlreadyExistsException("Developer with email " + request.getEmail() + " already exists");
         }
@@ -117,6 +143,38 @@ public class DeveloperServiceImpl implements DeveloperService {
         }
 
         buildFromRequest(developer, request);
+
+        // Ensure user account is linked and updated with any new password set by PM
+        User user = developer.getUser();
+        if (user == null) {
+            user = userRepository.findByEmail(request.getEmail())
+                    .or(() -> userRepository.findByUsername(request.getEmail()))
+                    .orElseGet(() -> {
+                        User newUser = new User();
+                        newUser.setUsername(request.getEmail());
+                        newUser.setEmail(request.getEmail());
+                        newUser.setFullName(request.getName());
+                        newUser.setRole(User.UserRole.DEVELOPER);
+                        String pwd = (request.getPassword() != null && !request.getPassword().isBlank())
+                                ? request.getPassword()
+                                : "Dev@" + UUID.randomUUID().toString().substring(0, 8);
+                        newUser.setPassword(passwordEncoder.encode(pwd));
+                        return userRepository.save(newUser);
+                    });
+            developer.setUser(user);
+        }
+
+        if (user != null) {
+            user.setEmail(request.getEmail());
+            user.setUsername(request.getEmail());
+            user.setFullName(request.getName());
+            user.setRole(User.UserRole.DEVELOPER);
+            if (request.getPassword() != null && !request.getPassword().isBlank()) {
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+            }
+            userRepository.save(user);
+        }
+
         Developer updatedDeveloper = developerRepository.save(developer);
         return mapToResponse(updatedDeveloper);
     }
