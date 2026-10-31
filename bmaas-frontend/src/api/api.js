@@ -59,6 +59,8 @@ export const modulesAPI = {
     api.post(`/modules/${moduleId}/developers`, { developerId, roleOnModule }),
   unmapDeveloper: (moduleId, developerId) => 
     api.delete(`/modules/${moduleId}/developers/${developerId}`),
+  getDeveloperQueue: (moduleId) => 
+    api.get(`/modules/${moduleId}/developer-queue`),
 };
 
 // Developers API

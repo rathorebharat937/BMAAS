@@ -42,3 +42,16 @@ logging:
   level:
     com.bmaas: DEBUG
     org.springframework.security: DEBUG
+
+# Bug Assignment Priority Queue Configuration
+bmaas:
+  assignment:
+    weights:
+      workload: 0.60
+      experience: 0.40
+    workload-factors:
+      project: 0.20
+      module: 0.30
+      bug: 0.50
+    experience-cap-years: 5.0
+

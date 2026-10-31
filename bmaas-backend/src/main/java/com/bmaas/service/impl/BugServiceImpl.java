@@ -2,6 +2,8 @@ package com.bmaas.service.impl;
 
 import com.bmaas.dto.bug.BugRequest;
 import com.bmaas.dto.bug.BugResponse;
+import com.bmaas.dto.assignment.AssignmentResultDTO;
+import com.bmaas.dto.assignment.DeveloperScoreDTO;
 import com.bmaas.entity.Bug;
 import com.bmaas.entity.Bug.BugPriority;
 import com.bmaas.entity.Bug.BugSeverity;
@@ -39,6 +41,7 @@ public class BugServiceImpl implements BugService {
     private final DeveloperRepository developerRepository;
     private final SlaService slaService;
     private final DeveloperMetricsService developerMetricsService;
+    private final com.bmaas.service.BugAutoAssignmentService bugAutoAssignmentService;
 
     // Full reconciled status transitions
     private static final Map<BugStatus, Set<BugStatus>> VALID_TRANSITIONS;
@@ -58,7 +61,8 @@ public class BugServiceImpl implements BugService {
     public BugServiceImpl(BugRepository bugRepository, ProjectRepository projectRepository,
                           ModuleRepository moduleRepository, UserRepository userRepository,
                           DeveloperRepository developerRepository, SlaService slaService,
-                          DeveloperMetricsService developerMetricsService) {
+                          DeveloperMetricsService developerMetricsService,
+                          com.bmaas.service.BugAutoAssignmentService bugAutoAssignmentService) {
         this.bugRepository = bugRepository;
         this.projectRepository = projectRepository;
         this.moduleRepository = moduleRepository;
@@ -66,6 +70,7 @@ public class BugServiceImpl implements BugService {
         this.developerRepository = developerRepository;
         this.slaService = slaService;
         this.developerMetricsService = developerMetricsService;
+        this.bugAutoAssignmentService = bugAutoAssignmentService;
     }
 
     @Override
@@ -106,7 +111,17 @@ public class BugServiceImpl implements BugService {
         bug.setSlaStatus(SlaStatus.ON_TRACK);
 
         Bug savedBug = bugRepository.save(bug);
-        return mapToResponse(savedBug);
+
+        // Execute intelligent automatic developer assignment via Dynamic Priority Queue
+        AssignmentResultDTO assignmentResult = bugAutoAssignmentService.autoAssignBug(savedBug, reporter);
+
+        BugResponse response = mapToResponse(savedBug);
+        response.setAssignmentMethod("ASSIGNED".equalsIgnoreCase(assignmentResult.getStatus())
+                ? "DYNAMIC_PRIORITY_QUEUE" : "UNASSIGNED");
+        response.setAssignmentMessage(assignmentResult.getMessage());
+        response.setAssignmentScore(assignmentResult.getWinningScore());
+        response.setCandidateScores(assignmentResult.getQueueSnapshot());
+        return response;
     }
 
     @Override
@@ -313,7 +328,10 @@ public class BugServiceImpl implements BugService {
         developerMetricsService.recordBugAssigned(developer, bug, assignedByUser);
 
         Bug updatedBug = bugRepository.save(bug);
-        return mapToResponse(updatedBug);
+        BugResponse response = mapToResponse(updatedBug);
+        response.setAssignmentMethod("MANUAL");
+        response.setAssignmentMessage("Assigned manually by Project Manager");
+        return response;
     }
 
     @Override
@@ -337,6 +355,12 @@ public class BugServiceImpl implements BugService {
         Bug bug = bugRepository.findById(bugId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bug not found with id: " + bugId));
         bugRepository.delete(bug);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DeveloperScoreDTO> getModuleDeveloperQueue(Long moduleId) {
+        return bugAutoAssignmentService.previewQueueForModule(moduleId);
     }
 
     private BugResponse mapToResponse(Bug bug) {

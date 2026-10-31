@@ -34,4 +34,6 @@ public interface BugService {
     BugResponse unassignBug(Long bugId);
 
     void deleteBug(Long bugId);
+
+    List<com.bmaas.dto.assignment.DeveloperScoreDTO> getModuleDeveloperQueue(Long moduleId);
 }

@@ -30,6 +30,12 @@ public class BugResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // Intelligent Bug Assignment (Priority Queue) Details
+    private String assignmentMethod;
+    private String assignmentMessage;
+    private Double assignmentScore;
+    private java.util.List<com.bmaas.dto.assignment.DeveloperScoreDTO> candidateScores;
+
     public BugResponse() {}
 
     // Getters and Setters
@@ -107,4 +113,16 @@ public class BugResponse {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getAssignmentMethod() { return assignmentMethod; }
+    public void setAssignmentMethod(String assignmentMethod) { this.assignmentMethod = assignmentMethod; }
+
+    public String getAssignmentMessage() { return assignmentMessage; }
+    public void setAssignmentMessage(String assignmentMessage) { this.assignmentMessage = assignmentMessage; }
+
+    public Double getAssignmentScore() { return assignmentScore; }
+    public void setAssignmentScore(Double assignmentScore) { this.assignmentScore = assignmentScore; }
+
+    public java.util.List<com.bmaas.dto.assignment.DeveloperScoreDTO> getCandidateScores() { return candidateScores; }
+    public void setCandidateScores(java.util.List<com.bmaas.dto.assignment.DeveloperScoreDTO> candidateScores) { this.candidateScores = candidateScores; }
 }

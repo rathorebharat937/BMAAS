@@ -97,6 +97,12 @@ public class BugController {
         return ResponseEntity.ok(ApiResponse.success("Bug assignment history retrieved successfully", history));
     }
 
+    @GetMapping("/modules/{moduleId}/developer-queue")
+    public ResponseEntity<ApiResponse> getModuleDeveloperQueue(@PathVariable Long moduleId) {
+        List<com.bmaas.dto.assignment.DeveloperScoreDTO> queue = bugService.getModuleDeveloperQueue(moduleId);
+        return ResponseEntity.ok(ApiResponse.success("Developer priority queue retrieved successfully", queue));
+    }
+
     @PatchMapping("/bugs/{bugId}/assign")
     public ResponseEntity<ApiResponse> assignBug(
             @PathVariable Long bugId,

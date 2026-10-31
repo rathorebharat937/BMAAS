@@ -21,6 +21,11 @@ function BugDetail() {
   const [assignmentHistory, setAssignmentHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
 
+  // Dynamic Priority Queue preview state
+  const [queueCandidates, setQueueCandidates] = useState([]);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [showQueueModal, setShowQueueModal] = useState(false);
+
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isPM = user.role === 'PROJECT_MANAGER';
   const isTester = user.role === 'TESTER';
@@ -37,6 +42,20 @@ function BugDetail() {
       setAssignmentHistory(res.data.data || []);
     } catch (e) {
       console.error('Error fetching assignment history:', e);
+    }
+  };
+
+  const handleViewQueue = async () => {
+    if (!bug?.moduleId) return;
+    setLoadingQueue(true);
+    setShowQueueModal(true);
+    try {
+      const res = await modulesAPI.getDeveloperQueue(bug.moduleId);
+      setQueueCandidates(res.data?.data || []);
+    } catch (e) {
+      console.error('Error fetching developer priority queue:', e);
+    } finally {
+      setLoadingQueue(false);
     }
   };
 
@@ -561,6 +580,16 @@ function BugDetail() {
                     )}
                   </div>
                 )}
+
+                <div className="mt-4 pt-3 border-t border-indigo-100">
+                  <button
+                    type="button"
+                    onClick={handleViewQueue}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold shadow-xs transition-colors"
+                  >
+                    <span>📊</span> View Module Priority Queue Ranking
+                  </button>
+                </div>
               </div>
             )}
 
@@ -751,6 +780,130 @@ function BugDetail() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Module Dynamic Priority Queue Ranking Modal */}
+      {showQueueModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-fadeIn">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <span>⚡</span> Module Developer Priority Queue
+                  </h2>
+                  <p className="text-xs text-indigo-200 mt-0.5">
+                    Live dynamic ranking for module: <span className="font-semibold text-white">{bug?.moduleName}</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowQueueModal(false)}
+                  className="text-white/80 hover:text-white text-xl font-bold p-1 rounded"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <span className="font-semibold text-gray-700">Algorithm Formula:</span> Workload Weight (60%) + Company Experience Weight (40%). Developers with lower active workload and longer organization tenure rank higher for intelligent bug assignments.
+              </div>
+
+              {loadingQueue ? (
+                <div className="py-8 text-center text-sm text-gray-500">
+                  Calculating real-time priority queue scores...
+                </div>
+              ) : queueCandidates.length === 0 ? (
+                <div className="py-8 text-center text-sm text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
+                  No eligible developers mapped to module <strong>{bug?.moduleName}</strong>.
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto max-h-72">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-50 text-gray-600 font-semibold border-b">
+                        <tr>
+                          <th className="py-2.5 px-3">Rank</th>
+                          <th className="py-2.5 px-3">Developer</th>
+                          <th className="py-2.5 px-3 text-center">Active Workload</th>
+                          <th className="py-2.5 px-3 text-center">Tenure</th>
+                          <th className="py-2.5 px-3 text-right">Composite Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {queueCandidates.map((c) => {
+                          const isCurrentAssigned = bug?.assignedDeveloperId === c.developerId;
+                          return (
+                            <tr
+                              key={c.developerId}
+                              className={
+                                isCurrentAssigned
+                                  ? 'bg-indigo-50/80 font-semibold'
+                                  : c.selected
+                                  ? 'bg-emerald-50/50'
+                                  : 'hover:bg-gray-50'
+                              }
+                            >
+                              <td className="py-2 px-3">
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                    c.rank === 1
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-gray-200 text-gray-700'
+                                  }`}
+                                >
+                                  #{c.rank}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{c.developerName}</span>
+                                  {isCurrentAssigned && (
+                                    <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-normal">
+                                      Assigned
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-gray-500 font-normal">
+                                  {c.roleOnModule || c.jobTitle || c.email}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-center text-gray-600 font-normal">
+                                {c.activeBugsCount} bugs · {c.activeModulesCount} mods
+                              </td>
+                              <td className="py-2 px-3 text-center text-gray-600 font-normal">
+                                {c.tenureYears} yrs
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-gray-900">
+                                {c.compositeScore}
+                                <span className="text-[10px] text-gray-400 font-normal">/100</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t">
+              <button
+                type="button"
+                onClick={() => setShowQueueModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

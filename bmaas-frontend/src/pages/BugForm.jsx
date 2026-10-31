@@ -11,6 +11,7 @@ function BugForm() {
   const [loadingModules, setLoadingModules] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [assignmentResult, setAssignmentResult] = useState(null);
 
   const [allProjects, setAllProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(routeProjectId || '');
@@ -135,8 +136,9 @@ function BugForm() {
         await bugsAPI.update(bugId, formData);
         navigate(`/bugs/${bugId}`);
       } else {
-        await bugsAPI.create(selectedProjectId, formData.moduleId, formData);
-        navigate(`/projects/${selectedProjectId}/bugs`);
+        const res = await bugsAPI.create(selectedProjectId, formData.moduleId, formData);
+        const createdBug = res.data?.data;
+        setAssignmentResult(createdBug);
       }
     } catch (err) {
       console.error('Error saving bug:', err);
@@ -410,6 +412,185 @@ function BugForm() {
           </form>
         </div>
       </main>
+
+      {/* Dynamic Priority Queue Assignment Result Modal */}
+      {assignmentResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-fadeIn">
+            {/* Modal Header */}
+            <div className={`p-6 ${assignmentResult.assignedDeveloperName ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white' : 'bg-gradient-to-r from-amber-600 to-orange-600 text-white'}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">
+                  {assignmentResult.assignedDeveloperName ? '🎯' : '⚠️'}
+                </span>
+                <div>
+                  <h2 className="text-xl font-bold">
+                    {assignmentResult.assignedDeveloperName
+                      ? 'Bug Created & Automatically Assigned!'
+                      : 'Bug Created (Pending Assignment)'}
+                  </h2>
+                  <p className="text-xs text-white/90 mt-0.5">
+                    Module-Based Dynamic Priority Queue Algorithm Assessment
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {/* Assignment Banner */}
+              {assignmentResult.assignedDeveloperName ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                      Top-Ranked Developer Assigned
+                    </div>
+                    <div className="text-lg font-bold text-gray-900 mt-0.5 flex items-center gap-2">
+                      <span>👤 {assignmentResult.assignedDeveloperName}</span>
+                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                        Rank #1
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Module: <span className="font-medium text-gray-700">{assignmentResult.moduleName}</span>
+                    </div>
+                  </div>
+                  {assignmentResult.assignmentScore != null && (
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Queue Score</div>
+                      <div className="text-2xl font-black text-emerald-700">
+                        {assignmentResult.assignmentScore}
+                        <span className="text-xs font-normal text-gray-500">/100</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="text-xs font-bold text-amber-800 uppercase tracking-wide">
+                    Unassigned Status
+                  </div>
+                  <p className="text-xs text-amber-900 mt-1">
+                    {assignmentResult.assignmentMessage ||
+                      'No eligible active developers are mapped to this module. Bug remains OPEN for manual Project Manager assignment.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Priority Queue Candidates Snapshot */}
+              {assignmentResult.candidateScores && assignmentResult.candidateScores.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      Module Developer Queue Ranking Snapshot
+                    </h3>
+                    <span className="text-xs text-gray-400">
+                      Weights: Workload 60% · Experience 40%
+                    </span>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto max-h-56">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-50 text-gray-600 font-semibold border-b">
+                          <tr>
+                            <th className="py-2 px-3">Rank</th>
+                            <th className="py-2 px-3">Developer</th>
+                            <th className="py-2 px-3 text-center">Active Work</th>
+                            <th className="py-2 px-3 text-center">Tenure</th>
+                            <th className="py-2 px-3 text-right">Score</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {assignmentResult.candidateScores.map((c) => (
+                            <tr
+                              key={c.developerId}
+                              className={c.selected ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-gray-50'}
+                            >
+                              <td className="py-2 px-3">
+                                {c.selected ? (
+                                  <span className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                    #1
+                                  </span>
+                                ) : (
+                                  `#${c.rank}`
+                                )}
+                              </td>
+                              <td className="py-2 px-3">
+                                <div>{c.developerName}</div>
+                                {c.roleOnModule && (
+                                  <div className="text-[10px] text-gray-500 font-normal">
+                                    {c.roleOnModule}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-center text-gray-600 font-normal">
+                                {c.activeBugsCount} bugs · {c.activeModulesCount} mods
+                              </td>
+                              <td className="py-2 px-3 text-center text-gray-600 font-normal">
+                                {c.tenureYears} yrs
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-gray-900">
+                                {c.compositeScore}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bug Summary */}
+              <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-gray-800">Bug #{assignmentResult.id}:</span>{' '}
+                  {assignmentResult.title}
+                </div>
+                <div className="flex gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                    {assignmentResult.severity}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                    {assignmentResult.priority}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
+              <button
+                type="button"
+                onClick={() => {
+                  setAssignmentResult(null);
+                  setFormData({
+                    title: '',
+                    description: '',
+                    moduleId: formData.moduleId,
+                    severity: 'MEDIUM',
+                    priority: 'MEDIUM',
+                    environment: '',
+                    stepsToReproduce: '',
+                    expectedResult: '',
+                    actualResult: '',
+                  });
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-100"
+              >
+                Report Another Bug
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(`/bugs/${assignmentResult.id}`)}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm"
+              >
+                View Bug Details →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
